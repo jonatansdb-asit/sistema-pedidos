@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PEDIDOS ASIT</title>
+
+<style>
+body{
+    font-family: Arial, sans-serif;
+    background:#f4f6f9;
+    margin:0;
+    padding:20px;
+}
+.container{ max-width:1200px; margin:auto; }
+h1{text-align:center;}
+
+.card{
+    background:white;
+    padding:20px;
+    border-radius:10px;
+    box-shadow:0 4px 10px rgba(0,0,0,0.1);
+    margin-bottom:20px;
+}
+
+input, select{
+    padding:8px;
+    margin:5px 0;
+    width:100%;
+    border-radius:6px;
+    border:1px solid #ccc;
+}
+
+button{
+    padding:6px 10px;
+    border:none;
+    border-radius:6px;
+    cursor:pointer;
+    font-size:13px;
+    color:white;
+}
+
+.btn{ background:#2c3e50; }
+.btn-edit{ background:#3498db; }
+.btn-delete{ background:#e74c3c; }
+.btn-export{ background:#27ae60; }
+
+table{
+    width:100%;
+    border-collapse:collapse;
+}
+
+thead{ background:#2c3e50; color:white; }
+
+th, td{ padding:8px; text-align:left; }
+
+tr:nth-child(even){ background:#f2f2f2; }
+
+.status{
+    padding:5px 10px;
+    border-radius:20px;
+    font-size:12px;
+    font-weight:bold;
+    display:inline-block;
+    color:white;
+}
+
+.pendiente{ background:#f39c12; }
+.proceso{ background:#3498db; }
+.entregado{ background:#2ecc71; }
+
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>PEDIDOS ASIT 2026</h1>
+
+<!-- FORMULARIO -->
+<div class="card">
+    <h3 id="tituloForm">Agregar Pedido</h3>
+    <input type="date" id="fecha">
+    <input type="text" id="cliente" placeholder="Cliente">
+    <input type="text" id="descripcion" placeholder="Descripción">
+    <button class="btn" onclick="guardarPedido()">Guardar</button>
+    <button class="btn-export" onclick="exportarExcel()">Exportar a Excel</button>
+</div>
+
+<!-- FILTRO -->
+<div class="card">
+    <label>Filtrar por Estatus:</label>
+    <select id="filtro" onchange="renderPedidos()">
+        <option value="todos">Todos</option>
+        <option value="Pendiente">Pendiente</option>
+        <option value="En Proceso">En Proceso</option>
+        <option value="Entregado">Entregado</option>
+    </select>
+</div>
+
+<!-- TABLA -->
+<div class="card">
+<table>
+<thead>
+<tr>
+<th>Fecha</th>
+<th>Cliente</th>
+<th>Descripción</th>
+<th>Estatus</th>
+<th>Acciones</th>
+</tr>
+</thead>
+<tbody id="tablaPedidos"></tbody>
+</table>
+</div>
+
+</div>
+
+<script>
+
+let pedidos = JSON.parse(localStorage.getItem("pedidos")) || [];
+let editandoIndex = null;
+
+function guardarLocal(){
+    localStorage.setItem("pedidos", JSON.stringify(pedidos));
+}
+
+// 🔹 Formato día/mes/año
+function formatearFecha(fechaISO){
+    if(!fechaISO) return "";
+    let partes = fechaISO.split("-");
+    return partes[2] + "/" + partes[1] + "/" + partes[0];
+}
+
+function renderPedidos(){
+    let tabla = document.getElementById("tablaPedidos");
+    let filtro = document.getElementById("filtro").value;
+    tabla.innerHTML="";
+
+    pedidos.forEach((pedido,index)=>{
+        if(filtro==="todos" || pedido.estatus===filtro){
+            tabla.innerHTML += `
+            <tr>
+                <td>${formatearFecha(pedido.fecha)}</td>
+                <td>${pedido.cliente}</td>
+                <td>${pedido.descripcion}</td>
+                <td><span class="status ${pedido.clase}">${pedido.estatus}</span></td>
+                <td>
+                    <button class="btn" onclick="cambiarEstatus(${index})">Cambiar</button>
+                    <button class="btn-edit" onclick="editarPedido(${index})">Editar</button>
+                    <button class="btn-delete" onclick="eliminarPedido(${index})">Eliminar</button>
+                </td>
+            </tr>`;
+        }
+    });
+}
+
+function guardarPedido(){
+    let fecha = document.getElementById("fecha").value;
+    let cliente = document.getElementById("cliente").value;
+    let descripcion = document.getElementById("descripcion").value;
+
+    if(!fecha || !cliente || !descripcion){
+        alert("Complete todos los campos");
+        return;
+    }
+
+    if(editandoIndex === null){
+        pedidos.push({
+            fecha,
+            cliente,
+            descripcion,
+            estatus:"Pendiente",
+            clase:"pendiente"
+        });
+    } else {
+        pedidos[editandoIndex].fecha = fecha;
+        pedidos[editandoIndex].cliente = cliente;
+        pedidos[editandoIndex].descripcion = descripcion;
+        editandoIndex = null;
+        document.getElementById("tituloForm").innerText="Agregar Pedido";
+    }
+
+    limpiarFormulario();
+    guardarLocal();
+    renderPedidos();
+}
+
+function editarPedido(index){
+    let p = pedidos[index];
+    document.getElementById("fecha").value = p.fecha;
+    document.getElementById("cliente").value = p.cliente;
+    document.getElementById("descripcion").value = p.descripcion;
+    editandoIndex = index;
+    document.getElementById("tituloForm").innerText="Editar Pedido";
+}
+
+function eliminarPedido(index){
+    if(confirm("¿Eliminar pedido?")){
+        pedidos.splice(index,1);
+        guardarLocal();
+        renderPedidos();
+    }
+}
+
+function cambiarEstatus(index){
+    let estado = pedidos[index].estatus;
+
+    if(estado==="Pendiente"){
+        pedidos[index].estatus="En Proceso";
+        pedidos[index].clase="proceso";
+    }
+    else if(estado==="En Proceso"){
+        pedidos[index].estatus="Entregado";
+        pedidos[index].clase="entregado";
+    }
+    else{
+        pedidos[index].estatus="Pendiente";
+        pedidos[index].clase="pendiente";
+    }
+
+    guardarLocal();
+    renderPedidos();
+}
+
+function limpiarFormulario(){
+    document.getElementById("fecha").value="";
+    document.getElementById("cliente").value="";
+    document.getElementById("descripcion").value="";
+}
+
+function exportarExcel(){
+    let csv = "Fecha,Cliente,Descripción,Estatus\n";
+
+    pedidos.forEach(p=>{
+        csv += `${formatearFecha(p.fecha)},${p.cliente},${p.descripcion},${p.estatus}\n`;
+    });
+
+    let blob = new Blob([csv], {type:"text/csv"});
+    let url = window.URL.createObjectURL(blob);
+    let a = document.createElement("a");
+    a.href = url;
+    a.download = "pedidos.csv";
+    a.click();
+}
+
+renderPedidos();
+
+</script>
+
+</body>
+</html>
+
+
+
